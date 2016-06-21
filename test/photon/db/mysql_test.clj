@@ -71,6 +71,20 @@
       )
 
 
+    (testing "create and look up an event with payload"
+      (save-event db-spec {:order-id    2
+                           :stream-name "test-stream"
+                           :event-type  "test"
+                           :caused-by   "test-suite"
+                           :payload     "{\"fish\": \"Cod\"}"
+                           :service-id  "testing"
+                           :event-time  100})
+      (is (= false (nil? (find-event db-spec "test-stream" 2))))
+      (is (= false (nil? (find-event-by-id db-spec 2))))
+
+      )
+
+
     (testing "look up and search should return same result when only one order id exists"
       (is (= 1 (count (find-event-by-id db-spec 1))))
       (is (= (find-event db-spec "test-stream" 1) (first (find-event-by-id db-spec 1)))
@@ -80,6 +94,10 @@
     (testing "can delete an event"
       (delete-event db-spec 1)
       (is (empty? (find-event db-spec "test-stream" 1)))
+
+
+      (delete-event db-spec 2)
+      (is (empty? (find-event db-spec "test-stream" 2)))
       )
 
     (testing "can delete all events"
@@ -140,6 +158,18 @@
       (is (= (range 1 11) (map #(:order_id %) (get-events db-spec :__all__ 1 0 10))))
       )
 
+    (testing "can get all stream name"
+      (is (= '({:stream-name "stream-two"}
+                {:stream-name "stream-one"}) (all-stream-names db-spec)))
+
+      )
+
+    (delete-all-events db-spec)
+    ;checking we can write an event as per photon
+    (save-event db-spec {:local-id "5a09ddff-314e-4eb9-967b-2c612b87f2e6", :payload {:provider-id "test.one.com", :broadcast-channels ["abc studios"], :access-channel "abc", :content-segments ["TVBoxSets" "Variety"], :thrid-party true, :upstream-network-id 389038.0, :thrid-party-ads false, :teritories ["GB" "ROI"]}, :stream-name "provider-events", :event-type "created", :server-timestamp 1466505678927N, :photon-timestamp 1466505678927N, :order-id 1466505678927125N, :event-time 1466505679055}
+                )
+
     ;(testing "can clean up"  (drop-tables db-spec))
     )
+
   )

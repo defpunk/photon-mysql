@@ -3,12 +3,13 @@
     [photon.db :as db]
     [clojure.tools.logging :as log]
     [clojure.java.jdbc :as jdbc]
+    [cheshire.core :as cc]
     )
   )
 
 (def page-size 500)
 
-(def create-table-sql "CREATE TABLE IF NOT EXISTS event (order_id BIGINT NOT NULL,stream_name VARCHAR(100) NOT NULL,event_type VARCHAR(100),caused_by VARCHAR(100), caused_by_relation VARCHAR(100), payload JSON, service_id  VARCHAR(100),schema_url  VARCHAR(100), event_time BIGINT, PRIMARY KEY (order_id, stream_name))")
+(def create-table-sql "CREATE TABLE IF NOT EXISTS event (order_id BIGINT NOT NULL,stream_name VARCHAR(100) NOT NULL,event_type VARCHAR(100),caused_by VARCHAR(100), caused_by_relation VARCHAR(100), payload LONGTEXT, service_id  VARCHAR(100),schema_url  VARCHAR(100), event_time BIGINT, PRIMARY KEY (order_id, stream_name))")
 (def drop-table-sql "DROP TABLE event")
 
 (def trunc-event-sql "TRUNCATE TABLE event")
@@ -36,13 +37,14 @@ caused_by , caused_by_relation, payload, service_id ,schema_url, event_time  ) V
   )
 
 (defn save-event [db-spec event]
+  (log/info "saving event {}" event)
   (jdbc/execute! db-spec [insert-event-sql
-                          (:order-id event)
+                          (long (:order-id event))
                           (:stream-name event)
                           (:event-type event)
                           (:caused-by event)
                           (:caused-by-relation event)
-                          (:payload event)
+                          (cc/generate-string (:payload event))
                           (:service-id event)
                           (:schema-url event)
                           (:event-time event)
@@ -67,15 +69,16 @@ caused_by , caused_by_relation, payload, service_id ,schema_url, event_time  ) V
 (def setup-my-sql (memoize build-my-sql))
 
 (defn db-event->map [e]
-  {:order-id (:order_id e)
-   :stream-name (:stream_name e)
-   :event-type (:event_type e)
-   :caused-by (:caused_by e)
+  (log/info "mapping db event {}" e)
+  {:order-id           (bigint (:order_id e))
+   :stream-name        (:stream_name e)
+   :event-type         (:event_type e)
+   :caused-by          (:caused_by e)
    :caused-by-relation (:caused_by_relation e)
-   :payload (:payload e)
-   :service-id (:service_id e)
-   :event-time (:event_time e)
-   :schema-url (:schema_url e)}
+   :payload            (cc/parse-string (:payload e) true)
+   :service-id         (:service_id e)
+   :event-time         (:event_time e)
+   :schema-url         (:schema_url e)}
   )
 
 (defn find-event-in-any-stream [db-spec id]
@@ -126,8 +129,9 @@ caused_by , caused_by_relation, payload, service_id ,schema_url, event_time  ) V
 
 (defn all-stream-names [db-spec]
   (let [result
-        (jdbc/query db-spec [select-all-stream-names-sql])]
-     (map #({:stream-name (get % :stream_name)})  result)
+        (jdbc/query db-spec [select-all-stream-names-sql])
+        fn (fn [x]  {:stream-name (get x :stream_name)})]
+     (map fn result)
     )
   )
 
